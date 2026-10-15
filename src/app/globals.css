@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+/*
+ * Admin Panel tokens. Same family as the Caption Arena app (tomato primary,
+ * amber accent) on a cooler, quieter surface suited to data.
+ * Chart tokens follow the validated dataviz reference palette.
+ */
+:root {
+  --background: #f7f6f3;
+  --foreground: #1b1917;
+  --card: #ffffff;
+  --border: #e4e1da;
+  --muted: #6b665f;
+  --primary: #d9482b;
+  --primary-foreground: #ffffff;
+  --accent: #f5b400;
+  --accent-foreground: #2a1e00;
+  --sidebar: #1f1b18;
+  --sidebar-foreground: #f3eee8;
+  --danger: #c62f2f;
+
+  /* Charts (dataviz reference palette, light) */
+  --chart-surface: #fcfcfb;
+  --chart-grid: #e1e0d9;
+  --chart-axis: #c3c2b7;
+  --chart-ink: #0b0b0b;
+  --chart-ink-2: #52514e;
+  --chart-muted: #898781;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  /* Diverging (upvotes vs downvotes): blue <-> red, gray midpoint */
+  --div-pos: #2a78d6;
+  --div-neg: #e34948;
+  --div-mid: #f0efec;
+  /* Sequential blue ramp for heatmaps */
+  --seq-0: #f0efec;
+  --seq-1: #cde2fb;
+  --seq-2: #9ec5f4;
+  --seq-3: #6da7ec;
+  --seq-4: #3987e5;
+  --seq-5: #256abf;
+  --seq-6: #184f95;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121110;
+    --foreground: #f0ece6;
+    --card: #1c1a18;
+    --border: #2f2b28;
+    --muted: #a8a197;
+    --primary: #e2593b;
+    --primary-foreground: #ffffff;
+    --accent: #f5b400;
+    --accent-foreground: #2a1e00;
+    --sidebar: #0c0b0a;
+    --sidebar-foreground: #f3eee8;
+    --danger: #e66767;
+
+    --chart-surface: #1a1a19;
+    --chart-grid: #2c2c2a;
+    --chart-axis: #383835;
+    --chart-ink: #f0efec;
+    --chart-ink-2: #c3c2b7;
+    --chart-muted: #898781;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --div-pos: #3987e5;
+    --div-neg: #e66767;
+    --div-mid: #383835;
+    --seq-0: #262624;
+    --seq-1: #104281;
+    --seq-2: #184f95;
+    --seq-3: #1c5cab;
+    --seq-4: #256abf;
+    --seq-5: #3987e5;
+    --seq-6: #6da7ec;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ---- Buttons: big, solid, obvious ------------------------------------- */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 h-10 text-sm font-semibold
+      transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50
+      focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary;
+  }
+  .btn-primary {
+    @apply bg-primary text-primary-foreground shadow-sm hover:brightness-110;
+  }
+  .btn-secondary {
+    @apply border-2 border-border bg-card text-foreground hover:border-primary hover:text-primary;
+  }
+  .btn-danger {
+    @apply bg-danger text-white shadow-sm hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply text-muted hover:bg-border/60 hover:text-foreground;
+  }
+  .btn-sm {
+    @apply h-8 rounded-lg px-3 text-xs;
+  }
+  .btn-lg {
+    @apply h-12 rounded-2xl px-6 text-base;
+  }
+  .input {
+    @apply h-10 w-full rounded-xl border-2 border-border bg-card px-3 text-sm outline-none
+      transition focus:border-primary;
+  }
+  .card {
+    @apply rounded-2xl border border-border bg-card shadow-sm;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold;
+  }
+}
