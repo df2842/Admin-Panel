@@ -36,8 +36,8 @@ function mediaHref(query: Query, patch: Partial<Query> = {}): string {
 }
 
 function scoreTone(score: number) {
-  if (score > 0) return "bg-(--div-pos) text-white";
-  if (score < 0) return "bg-(--div-neg) text-white";
+  if (score > 0) return "bg-(--score-pos-bg) text-(--score-pos-fg)";
+  if (score < 0) return "bg-(--score-neg-bg) text-(--score-neg-fg)";
   return "bg-black/60 text-white";
 }
 

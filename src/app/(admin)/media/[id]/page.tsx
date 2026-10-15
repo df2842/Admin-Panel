@@ -5,7 +5,7 @@ import DescriptionEditor from "@/components/media/DescriptionEditor";
 import { AddCaptionForm, DeleteImageButton, GenerateCaptions } from "@/components/media/JokeTools";
 import { Banner, ErrorCard } from "@/components/media/Notice";
 import { requireAdmin } from "@/lib/admin";
-import { formatDateTime, signed } from "@/lib/format";
+import { formatDateTime, signed, trustedImageUrl } from "@/lib/format";
 import {
   APP_URL,
   MAX_JOKES_PER_PHOTO,
@@ -96,10 +96,10 @@ export default async function MediaDetailPage({ params, searchParams }: Props) {
         {/* Left: the photo, facts and description */}
         <section className="space-y-4" aria-label="Photo">
           <div className="card overflow-hidden">
-            <a href={image.public_url} target="_blank" rel="noreferrer" title="Open full size">
+            <a href={trustedImageUrl(image.public_url)} target="_blank" rel="noreferrer" title="Open full size">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={image.public_url}
+                src={trustedImageUrl(image.public_url)}
                 alt={image.description.slice(0, 200)}
                 className="max-h-[70vh] w-full bg-border/40 object-contain"
               />
@@ -121,7 +121,7 @@ export default async function MediaDetailPage({ params, searchParams }: Props) {
             <dt className="text-muted">File</dt>
             <dd className="min-w-0">
               <a
-                href={image.public_url}
+                href={trustedImageUrl(image.public_url)}
                 target="_blank"
                 rel="noreferrer"
                 className="break-all font-mono text-xs text-primary hover:underline"

@@ -15,7 +15,7 @@ import {
   VoteBadge,
 } from "@/components/tables/ui";
 import { requireAdmin } from "@/lib/admin";
-import { compactNumber, displayName, formatDate, formatDateTime, signed, timeAgo } from "@/lib/format";
+import { compactNumber, displayName, formatDate, formatDateTime, signed, timeAgo, trustedImageUrl } from "@/lib/format";
 import {
   errorMessage,
   hrefWith,
@@ -155,7 +155,7 @@ export default async function UserPage({ params }: { params: Promise<{ id: strin
                     <div className="aspect-square bg-border">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={photo.public_url}
+                        src={trustedImageUrl(photo.public_url)}
                         alt={photo.description ? photo.description.slice(0, 120) : "Uploaded photo"}
                         loading="lazy"
                         className="h-full w-full object-cover transition group-hover:scale-[1.03]"

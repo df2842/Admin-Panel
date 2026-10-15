@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { addCaption, deleteImage, generateCaptions } from "@/app/(admin)/media/actions";
 import type { JokeStyle } from "@/lib/joke-styles";
 import { AI_BATCH, CAPTION_MAX, MAX_JOKES_PER_PHOTO } from "@/lib/media";
@@ -134,18 +134,36 @@ export function DeleteImageButton({
 }) {
   const [confirming, setConfirming] = useState(false);
   const { pending, result, run } = useAction();
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const openRef = useRef<HTMLButtonElement>(null);
+  const opened = useRef(false);
+
+  // Move focus into the confirmation when it opens, and back when cancelled.
+  useEffect(() => {
+    if (confirming) {
+      opened.current = true;
+      cancelRef.current?.focus();
+    } else if (opened.current) {
+      openRef.current?.focus();
+    }
+  }, [confirming]);
 
   if (!confirming) {
     return (
-      <button type="button" className="btn btn-danger btn-lg" onClick={() => setConfirming(true)}>
+      <button ref={openRef} type="button" className="btn btn-danger btn-lg" onClick={() => setConfirming(true)}>
         🗑️ Delete photo
       </button>
     );
   }
 
   return (
-    <div role="alertdialog" aria-label="Confirm delete" className="card space-y-3 border-danger/50 p-4">
-      <p className="text-sm font-semibold">
+    <div
+      role="alertdialog"
+      aria-label="Confirm delete"
+      aria-describedby={`delete-${imageId}-q`}
+      className="card space-y-3 border-danger/50 p-4"
+    >
+      <p id={`delete-${imageId}-q`} className="text-sm font-semibold">
         Delete this photo, its {jokeCount} joke{jokeCount === 1 ? "" : "s"} and {voteCount} vote
         {voteCount === 1 ? "" : "s"}? This can&apos;t be undone.
       </p>
@@ -159,6 +177,7 @@ export function DeleteImageButton({
           {pending ? "Deleting…" : "Yes, delete everything"}
         </button>
         <button
+          ref={cancelRef}
           type="button"
           disabled={pending}
           className="btn btn-secondary btn-lg"

@@ -108,7 +108,12 @@ export default async function DashboardPage() {
               note={t.usersSource === "profiles" ? "Signed-in accounts" : "Seen uploading or voting"}
             />
             <StatTile label="Photos" value={bigNumber(t.photos)} delta={s.recent.photos} />
-            <StatTile label="AI jokes" value={bigNumber(t.jokes)} delta={s.recent.jokes} />
+            <StatTile
+              label="AI jokes"
+              value={bigNumber(t.aiJokes)}
+              delta={s.recent.jokes}
+              note={t.jokes > t.aiJokes ? `+${t.jokes - t.aiJokes} written by hand` : undefined}
+            />
             <StatTile
               label="Votes cast"
               value={bigNumber(t.votes)}

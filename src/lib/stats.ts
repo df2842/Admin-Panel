@@ -1,7 +1,9 @@
 import type { Supabase } from "@/lib/admin";
 import { fetchAll } from "@/lib/data";
 import { prettyModel } from "@/lib/joke-styles";
+import { MANUAL_MODEL } from "@/lib/media";
 import type { CaptionRow, ImageRow, Profile, VoteRow } from "@/lib/types";
+import { trustedImageUrl } from "@/lib/format";
 
 /**
  * Everything the dashboard shows, computed in one pass from full table reads.
@@ -120,6 +122,8 @@ export type DashboardStats = {
     usersSource: "profiles" | "activity";
     photos: number;
     jokes: number;
+    /** Jokes written by the AI (excludes ones an admin typed by hand). */
+    aiJokes: number;
     votes: number;
     upvotes: number;
     downvotes: number;
@@ -239,7 +243,7 @@ export async function getDashboardStats(supabase: Supabase): Promise<DashboardSt
       model: c.model,
       createdAt: c.created_at,
       imageId: c.image_id,
-      imageUrl: img?.public_url ?? null,
+      imageUrl: img ? trustedImageUrl(img.public_url) : null,
       imageDescription: img?.description ?? null,
       upvotes: t.up,
       downvotes: t.down,
@@ -275,7 +279,7 @@ export async function getDashboardStats(supabase: Supabase): Promise<DashboardSt
     const best = [...withVotes].sort((a, b) => b.score - a.score || b.upvotes - a.upvotes)[0] ?? null;
     return {
       id: img.id,
-      url: img.public_url,
+      url: trustedImageUrl(img.public_url),
       description: img.description,
       createdAt: img.created_at,
       uploader: personFor(img.user_id),
@@ -402,7 +406,7 @@ export async function getDashboardStats(supabase: Supabase): Promise<DashboardSt
       const ups = sum(list, (j) => j.upvotes);
       return {
         key: model || "unknown",
-        label: model ? prettyModel(model) : "Not recorded",
+        label: model === MANUAL_MODEL ? "Written by hand" : model ? prettyModel(model) : "Not recorded",
         jokes: list.length,
         votedJokes: withVotes.length,
         votes: votesN,
@@ -424,6 +428,7 @@ export async function getDashboardStats(supabase: Supabase): Promise<DashboardSt
     usersSource: profilesOk ? "profiles" : "activity",
     photos: images.length,
     jokes: jokes.length,
+    aiJokes: jokes.filter((j) => j.model?.trim() !== MANUAL_MODEL).length,
     votes: votes.length,
     upvotes,
     downvotes,

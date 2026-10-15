@@ -10,8 +10,9 @@ export default function DescriptionEditor({ imageId, initial }: { imageId: strin
   const [value, setValue] = useState(initial);
   const { pending, result, run, clear } = useAction();
 
-  const trimmed = value.replace(/\s+/g, " ").trim();
-  const changed = trimmed !== initial.trim();
+  const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
+  const trimmed = normalize(value);
+  const changed = trimmed !== normalize(initial);
   const valid = trimmed.length >= 1 && trimmed.length <= DESCRIPTION_MAX;
 
   return (

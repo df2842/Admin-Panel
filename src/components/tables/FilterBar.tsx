@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useTransition, type FormEvent, type ReactNode } from "react";
 
 /**
  * One row of filters above a table. Selects and radio pills apply as soon as
@@ -30,6 +30,21 @@ export default function FilterBar({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // The form remounts (key=stateKey) after every change to stay in sync with
+  // the URL; remember which control was used so keyboard focus comes back.
+  const formRef = useRef<HTMLFormElement>(null);
+  const refocus = useRef<{ name: string; value: string } | null>(null);
+  useEffect(() => {
+    const form = formRef.current;
+    const target = refocus.current;
+    if (!form || !target) return;
+    refocus.current = null;
+    const name = CSS.escape(target.name);
+    const el =
+      form.querySelector<HTMLElement>(`input[name="${name}"][value="${CSS.escape(target.value)}"]`) ??
+      form.querySelector<HTMLElement>(`select[name="${name}"]`);
+    el?.focus();
+  }, [stateKey]);
 
   function apply(form: HTMLFormElement) {
     const params = new URLSearchParams();
@@ -48,6 +63,7 @@ export default function FilterBar({
   function onChange(e: FormEvent<HTMLFormElement>) {
     const t = e.target;
     if (t instanceof HTMLSelectElement || (t instanceof HTMLInputElement && t.type === "radio")) {
+      refocus.current = { name: t.name, value: t.value };
       apply(e.currentTarget);
     }
   }
@@ -55,6 +71,7 @@ export default function FilterBar({
   return (
     <>
       <form
+        ref={formRef}
         key={stateKey}
         role="search"
         aria-label={label}

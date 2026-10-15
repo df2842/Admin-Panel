@@ -1,5 +1,5 @@
 import { formatDate, signed } from "@/lib/format";
-import { prettyModel } from "@/lib/joke-styles";
+import { modelLabel } from "@/lib/media";
 import type { JokeStat, PhotoStat } from "@/lib/stats";
 import Avatar from "./Avatar";
 import DataTable from "./DataTable";
@@ -53,7 +53,7 @@ function JokeCell({ joke }: { joke: JokeStat }) {
             {joke.upvotes} up · {joke.downvotes} down
           </span>
         </p>
-        <p className="mt-0.5 text-xs text-muted">{prettyModel(joke.model)}</p>
+        <p className="mt-0.5 text-xs text-muted">{modelLabel(joke.model)}</p>
       </div>
     </div>
   );

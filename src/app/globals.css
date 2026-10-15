@@ -6,6 +6,7 @@
  * Chart tokens follow the validated dataviz reference palette.
  */
 :root {
+  color-scheme: light;
   --background: #f7f6f3;
   --foreground: #1b1917;
   --card: #ffffff;
@@ -18,6 +19,11 @@
   --sidebar: #1f1b18;
   --sidebar-foreground: #f3eee8;
   --danger: #c62f2f;
+  /* Score badges: text colors that pass WCAG AA on their fills */
+  --score-pos-bg: #256abf;
+  --score-pos-fg: #ffffff;
+  --score-neg-bg: #c62f2f;
+  --score-neg-fg: #ffffff;
 
   /* Charts (dataviz reference palette, light) */
   --chart-surface: #fcfcfb;
@@ -46,6 +52,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --background: #121110;
     --foreground: #f0ece6;
     --card: #1c1a18;
@@ -58,6 +65,10 @@
     --sidebar: #0c0b0a;
     --sidebar-foreground: #f3eee8;
     --danger: #e66767;
+    --score-pos-bg: #3987e5;
+    --score-pos-fg: #0b0b0b;
+    --score-neg-bg: #e66767;
+    --score-neg-fg: #0b0b0b;
 
     --chart-surface: #1a1a19;
     --chart-grid: #2c2c2a;

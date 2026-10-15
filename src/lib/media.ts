@@ -2,6 +2,7 @@ import type { Supabase } from "@/lib/admin";
 import { fetchAll, profilesFor, scoresFor } from "@/lib/data";
 import { prettyModel } from "@/lib/joke-styles";
 import type { CaptionRow, CaptionScore, ImageRow, Profile, ScoredCaption } from "@/lib/types";
+import { trustedImageUrl } from "@/lib/format";
 
 /**
  * Media (photos + their jokes) helpers shared by the /media pages, the media
@@ -183,7 +184,7 @@ export async function loadMediaList(
     return {
       id: image.id,
       user_id: image.user_id,
-      public_url: image.public_url,
+      public_url: trustedImageUrl(image.public_url),
       description: image.description,
       created_at: image.created_at,
       jokes: captions.length,

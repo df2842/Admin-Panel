@@ -19,8 +19,8 @@ export type CaptionView = {
 };
 
 function scoreClass(score: number) {
-  if (score > 0) return "bg-(--div-pos) text-white";
-  if (score < 0) return "bg-(--div-neg) text-white";
+  if (score > 0) return "bg-(--score-pos-bg) text-(--score-pos-fg)";
+  if (score < 0) return "bg-(--score-neg-bg) text-(--score-neg-fg)";
   return "bg-border text-foreground";
 }
 
@@ -130,6 +130,7 @@ export default function CaptionItem({ caption, index }: { caption: CaptionView; 
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-danger">Delete this joke and its votes?</span>
                 <button
+                  key="confirm-yes"
                   type="button"
                   disabled={busy}
                   className="btn btn-danger"
@@ -138,10 +139,12 @@ export default function CaptionItem({ caption, index }: { caption: CaptionView; 
                   {remove.pending ? "Deleting…" : "Yes, delete"}
                 </button>
                 <button
+                  key="confirm-cancel"
                   type="button"
                   disabled={busy}
                   className="btn btn-secondary"
                   onClick={() => setConfirming(false)}
+                  autoFocus
                 >
                   Cancel
                 </button>

@@ -104,6 +104,19 @@ create policy "Superadmins read all votes"
   on public.votes for select to authenticated
   using (public.is_superadmin());
 
+-- Images: uploads must live in the uploader's own storage folder, and
+-- public_url must point at that same object, so nobody can plant an external
+-- link (both apps build these values themselves; this enforces it).
+drop policy if exists "Users insert their own images" on public.images;
+create policy "Users insert their own images"
+  on public.images for insert to authenticated
+  with check (
+    auth.uid() = user_id
+    and storage_path like auth.uid()::text || '/%'
+    and storage_path not like '%..%'
+    and public_url like '%/storage/v1/object/public/images/' || storage_path
+  );
+
 -- Images: superadmins can edit and delete any image.
 drop policy if exists "Superadmins update images" on public.images;
 create policy "Superadmins update images"

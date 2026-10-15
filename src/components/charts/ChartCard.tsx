@@ -39,7 +39,6 @@ export default function ChartCard({
           <button
             type="button"
             className="btn btn-secondary btn-sm shrink-0"
-            aria-pressed={tableView}
             onClick={() => setShowTable((v) => !v)}
           >
             {tableView ? "Show chart" : "Show table"}

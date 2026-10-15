@@ -48,3 +48,18 @@ export function signed(n: number): string {
 export function displayName(p: { full_name?: string | null; email?: string | null } | null | undefined): string {
   return p?.full_name || p?.email || "Unknown user";
 }
+
+const STORAGE_PREFIX = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/images/`;
+const IMAGE_PLACEHOLDER =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 3'><rect width='4' height='3' fill='%23d6d3cc'/></svg>";
+
+/**
+ * images.public_url is written by users, so only trust URLs that point into
+ * this project's own "images" storage bucket; anything else (an external
+ * link someone slipped in) is replaced by a neutral placeholder.
+ */
+export function trustedImageUrl(url: string | null | undefined): string {
+  return typeof url === "string" && url.startsWith(STORAGE_PREFIX) && !url.includes("..")
+    ? url
+    : IMAGE_PLACEHOLDER;
+}

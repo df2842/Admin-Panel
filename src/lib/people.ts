@@ -1,6 +1,7 @@
 import type { Supabase } from "@/lib/admin";
 import { fetchAll, inChunks, scoresFor } from "@/lib/data";
 import type { CaptionScore, Profile } from "@/lib/types";
+import { trustedImageUrl } from "@/lib/format";
 
 /**
  * Read-only data for the Users and Votes pages. Every query runs with the
@@ -342,7 +343,7 @@ export async function loadPerson(supabase: Supabase, id: string): Promise<Person
       id: v.id,
       value: v.value,
       created_at: v.created_at,
-      caption: c ? { id: c.id, text: c.text, image_id: c.image_id, image_url: img?.public_url ?? null } : null,
+      caption: c ? { id: c.id, text: c.text, image_id: c.image_id, image_url: img ? trustedImageUrl(img.public_url) : null } : null,
     };
   });
 
@@ -463,7 +464,7 @@ export async function loadVotes(supabase: Supabase, f: VoteFilters, now: number)
         value: v.value,
         created_at: v.created_at,
         user_id: v.user_id,
-        caption: c ? { id: c.id, text: c.text, image_id: c.image_id, image_url: img?.public_url ?? null } : null,
+        caption: c ? { id: c.id, text: c.text, image_id: c.image_id, image_url: img ? trustedImageUrl(img.public_url) : null } : null,
       };
     });
   }
