@@ -18,7 +18,7 @@ function isActive(pathname: string, href: string) {
 export default function AdminNav({ variant }: { variant: "sidebar" | "bar" }) {
   const pathname = usePathname();
   return (
-    <ul className={variant === "sidebar" ? "space-y-1" : "flex gap-1 overflow-x-auto"}>
+    <ul className={variant === "sidebar" ? "space-y-1" : "grid grid-cols-4 gap-1"}>
       {ITEMS.map((item) => {
         const active = isActive(pathname, item.href);
         return (
@@ -26,7 +26,11 @@ export default function AdminNav({ variant }: { variant: "sidebar" | "bar" }) {
             <Link
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
+              className={`flex items-center whitespace-nowrap rounded-xl font-semibold transition ${
+                variant === "bar"
+                  ? "flex-col justify-center gap-0.5 px-1 py-1.5 text-[11px]"
+                  : "gap-3 px-3 py-2.5 text-sm"
+              } ${
                 active ? "bg-primary text-primary-foreground shadow" : "text-sidebar-foreground/80 hover:bg-white/10"
               }`}
             >

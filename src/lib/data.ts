@@ -31,15 +31,24 @@ export async function scoresFor(supabase: Supabase, captionIds: string[]): Promi
   return new Map(rows.map((r) => [r.caption_id, r]));
 }
 
-/** Profiles by user id (admins can read every profile). */
+/**
+ * Profiles by user id (admins can read every profile). Names are only for
+ * display, so a failed lookup returns an empty map instead of breaking the
+ * page; callers fall back to short user ids.
+ */
 export async function profilesFor(supabase: Supabase, userIds: string[]): Promise<Map<string, Profile>> {
-  const rows = await inChunks<Profile>(userIds, (chunk) =>
-    supabase
-      .from("profiles")
-      .select("id, email, full_name, avatar_url, is_superadmin, created_at, last_sign_in_at")
-      .in("id", chunk),
-  );
-  return new Map(rows.map((r) => [r.id, r]));
+  try {
+    const rows = await inChunks<Profile>(userIds, (chunk) =>
+      supabase
+        .from("profiles")
+        .select("id, email, full_name, avatar_url, is_superadmin, created_at, last_sign_in_at")
+        .in("id", chunk),
+    );
+    return new Map(rows.map((r) => [r.id, r]));
+  } catch (err) {
+    console.error("[profilesFor] could not load profiles", err);
+    return new Map();
+  }
 }
 
 /**
