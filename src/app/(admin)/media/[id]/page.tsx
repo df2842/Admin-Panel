@@ -4,6 +4,7 @@ import CaptionItem, { type CaptionView } from "@/components/media/CaptionItem";
 import DescriptionEditor from "@/components/media/DescriptionEditor";
 import { AddCaptionForm, DeleteImageButton, GenerateCaptions } from "@/components/media/JokeTools";
 import { Banner, ErrorCard } from "@/components/media/Notice";
+import ReplacePhoto from "@/components/media/ReplacePhoto";
 import { requireAdmin } from "@/lib/admin";
 import { formatDateTime, signed, trustedImageUrl } from "@/lib/format";
 import {
@@ -16,8 +17,10 @@ import {
   type MediaDetail,
 } from "@/lib/media";
 
+export const metadata = { title: "Photo details" };
+
 export const dynamic = "force-dynamic";
-/** "Generate more with AI" runs as a server action on this page. */
+/** "Generate more with AI" runs as a server action on this page. (Replace photo uses PUT /api/media/[id].) */
 export const maxDuration = 60;
 
 type Props = {
@@ -104,6 +107,9 @@ export default async function MediaDetailPage({ params, searchParams }: Props) {
                 className="max-h-[70vh] w-full bg-border/40 object-contain"
               />
             </a>
+            <div className="border-t border-border p-3 sm:p-4">
+              <ReplacePhoto imageId={image.id} aiEnabled={aiEnabled} />
+            </div>
           </div>
 
           <dl className="card grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 p-4 text-sm sm:p-5">
@@ -142,7 +148,8 @@ export default async function MediaDetailPage({ params, searchParams }: Props) {
             </dd>
           </dl>
 
-          <DescriptionEditor imageId={image.id} initial={image.description} />
+          {/* Keyed on the photo, not its file: a replace keeps unsaved edits (the editor picks up a re-description). */}
+          <DescriptionEditor key={image.id} imageId={image.id} initial={image.description} />
         </section>
 
         {/* Right: jokes */}

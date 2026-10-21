@@ -15,6 +15,8 @@ import {
   type MediaSort,
 } from "@/lib/media";
 
+export const metadata = { title: "Media" };
+
 export const dynamic = "force-dynamic";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };

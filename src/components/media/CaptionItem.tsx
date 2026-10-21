@@ -37,9 +37,9 @@ export default function CaptionItem({ caption, index }: { caption: CaptionView; 
   const busy = save.pending || remove.pending;
 
   return (
-    <li className={`rounded-2xl border-2 p-4 ${caption.isTop ? "border-accent" : "border-border"} bg-card`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <span className="hidden h-8 w-8 shrink-0 place-items-center rounded-full bg-border/70 text-xs font-bold text-muted sm:grid">
+    <li className={`@container rounded-2xl border-2 p-4 ${caption.isTop ? "border-accent" : "border-border"} bg-card`}>
+      <div className="flex flex-col gap-3 @lg:flex-row @lg:items-start">
+        <span className="hidden h-8 w-8 shrink-0 place-items-center rounded-full bg-border/70 text-xs font-bold text-muted @lg:grid">
           {index + 1}
         </span>
 
@@ -112,7 +112,7 @@ export default function CaptionItem({ caption, index }: { caption: CaptionView; 
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-3 sm:items-end">
+        <div className="flex shrink-0 flex-col gap-3 @lg:items-end">
           <div className="flex items-center gap-2 text-sm font-semibold tabular-nums">
             <span title="Upvotes" className="rounded-lg bg-border/50 px-2 py-1">
               👍 {caption.upvotes}

@@ -1,20 +1,16 @@
 import { GoogleGenAI, ThinkingLevel, Type, type GenerateContentParameters } from "@google/genai";
+import type { LlmCall } from "@/lib/generation-log";
 import { JOKE_STYLES, parseStyle, type JokeStyle } from "@/lib/joke-styles";
+import {
+  DEFAULT_CONFIG,
+  fill,
+  hasPlaceholder,
+  splitMix,
+  type PipelineConfig,
+  type PipelineStep,
+} from "@/lib/pipeline-config";
 
 export { JOKE_STYLES, parseStyle, type JokeStyle };
-
-/**
- * Cheap, fast, highly available models, tried in order. Flash-Lite is the
- * cheapest Gemini tier and is on the free tier; if one model is overloaded
- * (503) or rate limited (429), the next one takes over.
- * Override with GEMINI_MODELS="model-a,model-b" (useful for testing).
- */
-const DEFAULT_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"];
-
-export function modelChain(): string[] {
-  const fromEnv = process.env.GEMINI_MODELS?.split(",").map((m) => m.trim()).filter(Boolean);
-  return fromEnv?.length ? fromEnv : DEFAULT_MODELS;
-}
 
 /** Each attempt gets at most this long before we move on to the next model. */
 const ATTEMPT_TIMEOUT_MS = 12_000;
@@ -51,7 +47,10 @@ function getClient() {
 /** Statuses where trying another model (or later) can help. */
 const TRANSIENT = new Set([404, 408, 429, 500, 502, 503, 504]);
 
-function userMessage(statuses: (number | undefined)[]): string {
+/** Why one attempt failed: an HTTP status, output the step couldn't use, or unknown. */
+type Failure = number | "unusable" | undefined;
+
+function userMessage(statuses: Failure[]): string {
   if (statuses.some((s) => s === 401 || s === 403)) {
     return "The AI service rejected the server's API key. The site owner needs to check it.";
   }
@@ -61,34 +60,89 @@ function userMessage(statuses: (number | undefined)[]): string {
   if (statuses.some((s) => s === 429)) {
     return "The AI hit its free usage limit for the moment. Please try again in a minute.";
   }
+  if (statuses.some((s) => s === "unusable")) {
+    return "The AI didn't write usable jokes this time. Please try again.";
+  }
   return "The AI models are busy right now. Please try again in a minute.";
 }
 
+/** Options shared by both prompt-chain steps. */
+export type RunOptions = {
+  config?: PipelineConfig;
+  /** Epoch ms by which the whole step must finish. */
+  deadline?: number;
+  /** Receives every model attempt (for the llm_responses log). */
+  onCall?: (call: LlmCall) => void;
+};
+
+type ModelRequest = Omit<GenerateContentParameters, "model">;
+/** Turns a model's text into what the step needs, or says briefly why it can't. */
+type Validator<T> = (text: string) => { value: T } | { unusable: string };
+
 /**
- * Runs one generateContent request against each model in the chain until one
- * succeeds. Returns the text and which model produced it. Every attempt is
- * bounded by both ATTEMPT_TIMEOUT_MS and the overall `deadline` (epoch ms), so
- * a caller with a hard time limit always gets a clean error in time.
+ * Runs one generateContent request against each configured model in priority
+ * order until one succeeds. Every attempt is bounded by ATTEMPT_TIMEOUT_MS and
+ * the overall deadline, and reported through onCall. With `validate`, an
+ * answer only counts once it passes; unusable output is logged as an error
+ * and the next model is tried.
  */
 async function generate(
-  request: Omit<GenerateContentParameters, "model">,
-  deadline = Date.now() + DEFAULT_BUDGET_MS,
-): Promise<{ text: string; model: string }> {
+  request: ModelRequest,
+  step: PipelineStep,
+  promptText: string,
+  options: RunOptions,
+): Promise<{ value: string; model: string }>;
+async function generate<T>(
+  request: ModelRequest,
+  step: PipelineStep,
+  promptText: string,
+  options: RunOptions,
+  validate: Validator<T>,
+): Promise<{ value: T; model: string }>;
+async function generate<T>(
+  request: ModelRequest,
+  step: PipelineStep,
+  promptText: string,
+  { config = DEFAULT_CONFIG, deadline = Date.now() + DEFAULT_BUDGET_MS, onCall }: RunOptions,
+  validate?: Validator<T>,
+): Promise<{ value: T | string; model: string }> {
   const ai = getClient(); // a missing key is a config error, not a busy model
   const causes: string[] = [];
-  const statuses: (number | undefined)[] = [];
+  const statuses: Failure[] = [];
+  let attempt = 0;
 
-  for (const model of modelChain()) {
+  for (const model of config.models) {
+    attempt += 1;
+    const started = Date.now();
+    const report = (status: LlmCall["status"], extra: Partial<LlmCall>) =>
+      onCall?.({
+        stepOrder: step.order,
+        stepName: step.name,
+        modelId: model.id,
+        apiModelId: model.apiModelId,
+        attempt,
+        status,
+        latencyMs: Date.now() - started,
+        inputTokens: null,
+        outputTokens: null,
+        prompt: promptText,
+        responseText: null,
+        error: null,
+        ...extra,
+      });
+
     const remaining = deadline - Date.now();
     if (remaining < MIN_ATTEMPT_MS) {
-      causes.push(`${model}: skipped, out of time`);
+      report("error", { error: "Skipped: out of time" });
+      causes.push(`${model.apiModelId}: skipped, out of time`);
       statuses.push(504);
-      break;
+      continue;
     }
+
     try {
       const response = await ai.models.generateContent({
         ...request,
-        model,
+        model: model.apiModelId,
         config: {
           ...request.config,
           thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
@@ -96,16 +150,34 @@ async function generate(
         },
       });
       const text = response.text?.trim();
-      if (text) return { text, model };
+      const usage = {
+        inputTokens: response.usageMetadata?.promptTokenCount ?? null,
+        outputTokens: response.usageMetadata?.candidatesTokenCount ?? null,
+      };
+      if (text) {
+        const checked = validate ? validate(text) : { value: text };
+        if ("value" in checked) {
+          report("ok", { ...usage, responseText: text });
+          return { value: checked.value, model: model.apiModelId };
+        }
+        // e.g. cut-off JSON or no caption that passes the filters; another model may do better.
+        report("error", { ...usage, responseText: text, error: `Unusable output: ${checked.unusable}` });
+        causes.push(`${model.apiModelId}: unusable output (${checked.unusable})`);
+        statuses.push("unusable");
+        continue;
+      }
       // Usually a safety block; another model may answer.
-      causes.push(`${model}: empty response (${response.candidates?.[0]?.finishReason ?? "no candidates"})`);
+      const reason = response.candidates?.[0]?.finishReason ?? "no candidates";
+      report("empty", { ...usage, error: `Empty response (${reason})` });
+      causes.push(`${model.apiModelId}: empty response (${reason})`);
       statuses.push(undefined);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       // Gemini reports a bad or expired key as a 400; treat it as an auth error.
       const keyProblem = /API_KEY_INVALID|API key not valid|API key expired/i.test(message);
       const status = keyProblem ? 401 : (err as { status?: number }).status;
-      causes.push(`${model}: ${status ?? ""} ${message.slice(0, 160)}`.trim());
+      report("error", { error: `${status ?? ""} ${message}`.trim() });
+      causes.push(`${model.apiModelId}: ${status ?? ""} ${message.slice(0, 160)}`.trim());
       statuses.push(status);
       // A bad key won't work on any model; stop early. 400s are tried on the
       // next model because some are model-specific (unsupported settings).
@@ -123,86 +195,130 @@ async function generate(
 export async function describeImage(
   base64: string,
   mediaType: ImageMediaType,
-  deadline?: number,
+  options: RunOptions = {},
 ): Promise<{ description: string; model: string }> {
-  const { text, model } = await generate({
-    contents: [
-      { inlineData: { mimeType: mediaType, data: base64 } },
-      { text: "Describe this image." },
-    ],
-    config: {
-      systemInstruction:
-        "You describe photos for a comedy writer who cannot see them. Be concrete and vivid: " +
-        "who or what is in the frame, expressions, body language, setting, any text in the image, " +
-        "and anything odd, awkward or surprising. Two to four sentences of plain prose, no lists. " +
-        "Describe people neutrally and never guess their identity.",
-      temperature: 0.5,
+  const config = options.config ?? DEFAULT_CONFIG;
+  const step = config.describe;
+  // Only models that read images get the photo; the built-in ones if none do.
+  const vision = config.models.filter((m) => m.supportsVision);
+  const models = vision.length > 0 ? vision : DEFAULT_CONFIG.models;
+  const systemPrompt = fill(step.systemPrompt, {});
+  const userPrompt = fill(step.userPrompt, {});
+  const { value, model } = await generate(
+    {
+      contents: [{ inlineData: { mimeType: mediaType, data: base64 } }, { text: userPrompt }],
+      config: { systemInstruction: systemPrompt, temperature: step.temperature },
     },
-  }, deadline);
-  return { description: text, model };
+    step,
+    `${systemPrompt}\n\n---\n\n[image: ${mediaType}]\n${userPrompt}`,
+    { ...options, config: { ...config, models } },
+  );
+  return { description: value, model };
 }
 
 const MAX_CAPTION_LENGTH = 110;
 
+/** The style sentence for the joke step: a fixed style, or the database mix. */
+function styleInstruction(style: JokeStyle, count: number, config: PipelineConfig): string {
+  if (style !== "mixed") return JOKE_STYLES[style].prompt;
+  const parts = splitMix(config.mix, count);
+  if (parts.length === 0) return JOKE_STYLES.mixed.prompt;
+  if (parts.length === 1) return `Every caption is ${parts[0].flavor.instruction}.`;
+  const list = parts.map((p) => `${p.n} that ${p.n === 1 ? "is" : "are each"} ${p.flavor.instruction}`);
+  return `Mix styles: write ${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}.`;
+}
+
 /**
  * Prompt-chain step 2: turn the description into jokes about this exact photo.
- * A JSON response schema guarantees we get an array of strings back.
- * `avoid` lists jokes the picture already has, so "more jokes" stays fresh.
+ * Uses the configured system prompt, the mix, comedy terms and few-shot
+ * examples. A JSON response schema asks for an array of strings, and each
+ * answer is checked before it counts. `avoid` lists jokes the picture
+ * already has, so "more jokes" stays fresh.
  */
 export async function writeCaptions(
   description: string,
-  options: { style?: JokeStyle; count?: number; avoid?: string[]; deadline?: number } = {},
+  options: RunOptions & { style?: JokeStyle; count?: number; avoid?: string[] } = {},
 ): Promise<{ captions: string[]; model: string }> {
-  const style = JOKE_STYLES[options.style ?? "mixed"];
+  const config = options.config ?? DEFAULT_CONFIG;
+  const step = config.joke;
+  const style = options.style ?? "mixed";
   const count = Math.min(Math.max(options.count ?? 4, 1), 6);
   const avoid = (options.avoid ?? []).slice(0, 30);
+  const values = { count: String(count), style: styleInstruction(style, count, config), description };
 
-  const { text, model } = await generate({
-    contents:
-      `Photo description:\n${description}` +
-      (avoid.length
-        ? `\n\nThis photo already has these captions. Do not repeat or paraphrase them:\n- ${avoid.join("\n- ")}`
-        : ""),
-    config: {
-      systemInstruction:
-        `You write meme captions that get printed on top of a photo. Write exactly ${count} ` +
-        "jokes about the photo described. Every joke must hinge on a specific detail of THIS " +
-        "photo, something you could only write after seeing it, not a generic one-liner. " +
-        `${style.prompt} Each caption is one punchy line under 90 characters. ` +
-        "No hashtags, no emojis, no surrounding quotation marks, no explanations. " +
-        "Keep it PG-13 and never mock anyone's body, race, gender or identity.",
-      temperature: 1.0,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          captions: { type: Type.ARRAY, items: { type: Type.STRING } },
+  // A custom prompt may leave out a placeholder. Add what it skipped, so the
+  // model still gets the description, the count and the style.
+  const prompts = `${step.systemPrompt}\n${step.userPrompt}`;
+  const sections = [fill(step.userPrompt, values)];
+  if (!hasPlaceholder(prompts, "description")) sections.unshift(`Photo description:\n${description}`);
+  if (config.terms.length) {
+    sections.push(
+      "Comedy techniques you can use:\n" +
+        config.terms.map((t) => `- ${t.term}: ${t.definition}${t.example ? ` (e.g. "${t.example}")` : ""}`).join("\n"),
+    );
+  }
+  if (config.examples.length) {
+    sections.push(
+      "Examples of the tone we want (different photos, do not reuse them):\n" +
+        config.examples
+          .map((e) => `- Photo: ${e.description}\n  Caption${e.flavor ? ` (${e.flavor})` : ""}: ${e.caption}`)
+          .join("\n"),
+    );
+  }
+  if (avoid.length) {
+    sections.push(`This photo already has these captions. Do not repeat or paraphrase them:\n- ${avoid.join("\n- ")}`);
+  }
+  const userPrompt = sections.filter(Boolean).join("\n\n");
+  const systemPrompt = [
+    fill(step.systemPrompt, values),
+    hasPlaceholder(prompts, "count") ? "" : `Write exactly ${count} captions.`,
+    hasPlaceholder(prompts, "style") ? "" : values.style,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  // Only an answer with at least one usable caption counts; otherwise the next model tries.
+  const parseCaptions: Validator<string[]> = (text) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return { unusable: "malformed JSON" };
+    }
+    const list = (parsed as { captions?: unknown } | null)?.captions;
+    const seen = new Set(avoid.map((a) => a.toLowerCase()));
+    const captions = (Array.isArray(list) ? list : [])
+      .filter((c): c is string => typeof c === "string")
+      .map((c) => c.trim().replace(/^["“]+|["”]+$/g, "").trim())
+      .filter((c) => c.length > 0 && c.length <= MAX_CAPTION_LENGTH)
+      .filter((c) => {
+        const key = c.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, count);
+    return captions.length > 0 ? { value: captions } : { unusable: "no usable captions" };
+  };
+
+  const { value: captions, model } = await generate(
+    {
+      contents: userPrompt,
+      config: {
+        systemInstruction: systemPrompt,
+        temperature: step.temperature,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: { captions: { type: Type.ARRAY, items: { type: Type.STRING } } },
+          required: ["captions"],
         },
-        required: ["captions"],
       },
     },
-  }, options.deadline);
-
-  let parsed: { captions?: unknown };
-  try {
-    parsed = JSON.parse(text) as { captions?: unknown };
-  } catch {
-    throw new Error("The model returned malformed captions. Please try again.");
-  }
-
-  const seen = new Set(avoid.map((a) => a.toLowerCase()));
-  const captions = (Array.isArray(parsed.captions) ? parsed.captions : [])
-    .filter((c): c is string => typeof c === "string")
-    .map((c) => c.trim().replace(/^["“]+|["”]+$/g, "").trim())
-    .filter((c) => c.length > 0 && c.length <= MAX_CAPTION_LENGTH)
-    .filter((c) => {
-      const key = c.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, count);
-
-  if (captions.length === 0) throw new Error("The model returned no usable captions. Please try again.");
+    step,
+    `${systemPrompt}\n\n---\n\n${userPrompt}`,
+    options,
+    parseCaptions,
+  );
   return { captions, model };
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { checkAdmin, type Supabase } from "@/lib/admin";
 import { writeCaptions } from "@/lib/captions";
+import { GenerationLog } from "@/lib/generation-log";
 import { JOKE_STYLES, type JokeStyle } from "@/lib/joke-styles";
 import {
   AI_BATCH,
@@ -15,6 +16,7 @@ import {
   isUuid,
   type ActionResult,
 } from "@/lib/media";
+import { loadPipelineConfig } from "@/lib/pipeline-config";
 
 /**
  * Admin mutations for photos and their jokes. Every action re-checks that the
@@ -124,7 +126,9 @@ export async function deleteCaption(captionId: unknown): Promise<ActionResult> {
 
 /**
  * Re-runs the second link of the prompt chain (description -> jokes) in the
- * chosen style, telling the model which jokes already exist.
+ * chosen style, telling the model which jokes already exist. Uses the
+ * database pipeline config and is logged as a "more_jokes" request, like
+ * Caption Arena's "more jokes" button.
  */
 export async function generateCaptions(imageId: unknown, style: unknown): Promise<ActionResult> {
   const auth = await checkAdmin();
@@ -147,26 +151,52 @@ export async function generateCaptions(imageId: unknown, style: unknown): Promis
   const room = MAX_JOKES_PER_PHOTO - existing.length;
   if (room <= 0) return fail(`This photo already has ${MAX_JOKES_PER_PHOTO} jokes. Delete some first.`);
 
+  const config = await loadPipelineConfig(supabase);
+  const log = await GenerationLog.start(supabase, {
+    userId: user.id,
+    kind: "more_jokes",
+    style: style as JokeStyle,
+    chainId: config.chainId,
+    imageId: image.id,
+  });
+
   let written: { captions: string[]; model: string };
   try {
     written = await writeCaptions(image.description, {
+      config,
       style: style as JokeStyle,
       count: Math.min(AI_BATCH, room),
       avoid: existing,
       deadline: Date.now() + 40_000,
+      onCall: (call) => log.call(call),
     });
   } catch (err) {
-    return fail(err instanceof Error ? err.message : "The AI could not write jokes right now.");
+    const message = err instanceof Error ? err.message : "The AI could not write jokes right now.";
+    await log.finish({ status: "failed", error: message });
+    return fail(message);
   }
 
   const { data: inserted, error: insertError } = await supabase
     .from("captions")
-    .insert(written.captions.map((text) => ({ image_id: image.id, user_id: user.id, text, model: written.model })))
+    .insert(
+      written.captions.map((text) => ({
+        image_id: image.id,
+        user_id: user.id,
+        text,
+        model: written.model,
+        ...(log.requestId ? { request_id: log.requestId } : {}),
+      })),
+    )
     .select("id");
-  if (insertError) return fail(insertError.code === "23503" ? GONE_PHOTO : insertError.message);
+  if (insertError) {
+    await log.finish({ status: "failed", error: insertError.message });
+    return fail(insertError.code === "23503" ? GONE_PHOTO : insertError.message);
+  }
 
-  refreshMedia(image.id);
   const n = inserted?.length ?? written.captions.length;
+  // image_id was set by start(); repeating it would fail the update if the photo was just deleted.
+  await log.finish({ status: "succeeded", captionCount: n });
+  refreshMedia(image.id);
   return { ok: true, message: `Added ${n} new joke${n === 1 ? "" : "s"}.` };
 }
 

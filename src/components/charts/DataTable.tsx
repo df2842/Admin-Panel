@@ -20,7 +20,7 @@ export default function DataTable({
 }) {
   return (
     <div>
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="relative overflow-x-auto rounded-xl border border-border">
         <table className="w-full text-sm">
           <caption className="sr-only">{caption}</caption>
           <thead className="bg-background/60 text-left text-xs text-muted">

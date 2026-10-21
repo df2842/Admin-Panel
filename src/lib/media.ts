@@ -80,6 +80,16 @@ export function sniffImage(bytes: Uint8Array): UploadMediaType | null {
 /** Result shape of every media server action. */
 export type ActionResult = { ok: true; message: string } | { ok: false; error: string };
 
+/** JSON body of a successful PUT /api/media/[id] (replace the photo file). */
+export type ReplacePhotoReply = {
+  ok: true;
+  publicUrl: string;
+  /** True when "Re-describe with AI" wrote a new description. */
+  described: boolean;
+  /** False when the old file couldn't be deleted from storage (harmless, just orphaned). */
+  oldFileRemoved: boolean;
+};
+
 // ---- Display helpers -----------------------------------------------------------
 
 export function shortId(id: string): string {

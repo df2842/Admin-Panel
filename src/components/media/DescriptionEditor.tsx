@@ -5,12 +5,23 @@ import { updateDescription } from "@/app/(admin)/media/actions";
 import { DESCRIPTION_MAX } from "@/lib/media";
 import { ResultLine, useAction } from "./useAction";
 
+const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
+
 /** Editable AI description (the text Gemini writes jokes from). */
 export default function DescriptionEditor({ imageId, initial }: { imageId: string; initial: string }) {
   const [value, setValue] = useState(initial);
+  // When the saved text changes (e.g. a photo replace re-described it), show
+  // it, unless there are unsaved edits: those are kept, with a note.
+  const [saved, setSaved] = useState(initial);
+  const [outdated, setOutdated] = useState(false);
+  if (initial !== saved) {
+    const edited = normalize(value) !== normalize(saved);
+    setSaved(initial);
+    if (!edited) setValue(initial);
+    setOutdated(edited && normalize(value) !== normalize(initial));
+  }
   const { pending, result, run, clear } = useAction();
 
-  const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
   const trimmed = normalize(value);
   const changed = trimmed !== normalize(initial);
   const valid = trimmed.length >= 1 && trimmed.length <= DESCRIPTION_MAX;
@@ -32,6 +43,14 @@ export default function DescriptionEditor({ imageId, initial }: { imageId: strin
         </span>
       </div>
       <p className="text-xs text-muted">The AI writes new jokes from this text, so keep it accurate.</p>
+      {outdated && changed && (
+        <p
+          role="status"
+          className="rounded-lg bg-amber-50 p-2 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          A new description was saved. Your unsaved edits are kept; &ldquo;Undo changes&rdquo; shows the new one.
+        </p>
+      )}
       <textarea
         id="description"
         value={value}
@@ -48,7 +67,14 @@ export default function DescriptionEditor({ imageId, initial }: { imageId: strin
           {pending ? "Saving…" : "Save description"}
         </button>
         {changed && !pending && (
-          <button type="button" className="btn btn-ghost" onClick={() => setValue(initial)}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setValue(initial);
+              setOutdated(false);
+            }}
+          >
             Undo changes
           </button>
         )}

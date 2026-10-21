@@ -42,9 +42,14 @@ export async function POST(request: NextRequest) {
   }
 
   const destination = safeNext(request.cookies.get(NEXT_COOKIE)?.value);
-  const response = NextResponse.redirect(sameOriginUrl(destination, request.url), 303);
-  response.cookies.set(NONCE_COOKIE, "", { path: "/auth/callback", maxAge: 0 });
-  response.cookies.set(NEXT_COOKIE, "", { path: "/auth/callback", maxAge: 0 });
+  // Cookies Supabase sets go onto whichever response we end up returning.
+  let response = NextResponse.redirect(sameOriginUrl(destination, request.url), 303);
+  const clearFlowCookies = (res: NextResponse) => {
+    res.cookies.set(NONCE_COOKIE, "", { path: "/auth/callback", maxAge: 0 });
+    res.cookies.set(NEXT_COOKIE, "", { path: "/auth/callback", maxAge: 0 });
+    return res;
+  };
+  clearFlowCookies(response);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,7 +68,7 @@ export async function POST(request: NextRequest) {
     },
   );
 
-  const { error } = await supabase.auth.signInWithIdToken({
+  const { data, error } = await supabase.auth.signInWithIdToken({
     provider: "google",
     token: credential,
     nonce,
@@ -71,6 +76,21 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     return toLogin(request, error.message);
+  }
+
+  // Only superadmins keep a session here. Anyone else is signed straight back
+  // out, so this app never hands a working session to an account that the
+  // Caption Arena sign-in list would turn away. (Signing in once still creates
+  // the profile row the owner needs to promote the first superadmin.)
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_superadmin")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  if (profile?.is_superadmin !== true) {
+    response = clearFlowCookies(toLogin(request, "Only superadmins can use the Admin Panel."));
+    await supabase.auth.signOut({ scope: "local" });
+    return response;
   }
   return response;
 }

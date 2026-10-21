@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { checkAdmin } from "@/lib/admin";
 import { describeImage, writeCaptions } from "@/lib/captions";
+import { GenerationLog, type LlmCall } from "@/lib/generation-log";
 import { JOKE_STYLES, type JokeStyle } from "@/lib/joke-styles";
 import {
   AI_BATCH,
@@ -15,6 +16,7 @@ import {
   cleanText,
   sniffImage,
 } from "@/lib/media";
+import { loadPipelineConfig } from "@/lib/pipeline-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +29,9 @@ const error = (message: string, status: number) => NextResponse.json({ error: me
 
 /**
  * Creates a photo for the admin panel.
- *   mode=ai:     Gemini describes the photo, then writes jokes in `style`.
+ *   mode=ai:     Gemini describes the photo, then writes jokes in `style`,
+ *                using the database pipeline config; logged as an "upload"
+ *                generation request (when the Week 7 tables exist).
  *   mode=manual: uses `description` and up to 6 `caption` fields from the form.
  * Uploads to storage under the admin's own folder, inserts the images row and
  * its captions, and rolls everything back if any step fails.
@@ -63,6 +67,8 @@ export async function POST(request: NextRequest) {
   let description: string;
   let captions: string[];
   let model: string;
+  /** The AI run's log (mode=ai only). */
+  let log: GenerationLog | null = null;
 
   if (mode === "ai") {
     if (!process.env.GEMINI_API_KEY) {
@@ -71,19 +77,31 @@ export async function POST(request: NextRequest) {
     const style = form.get("style");
     if (typeof style !== "string" || !Object.hasOwn(JOKE_STYLES, style)) return error("Pick a joke style.", 400);
 
-    const deadline = started + AI_BUDGET_MS;
+    // Same pipeline as Caption Arena: models, prompts, mix, terms and examples
+    // come from the database, and every model call is logged.
+    const config = await loadPipelineConfig(supabase);
+    const requestLog = await GenerationLog.start(supabase, {
+      userId: user.id,
+      kind: "upload",
+      style: style as JokeStyle,
+      chainId: config.chainId,
+    });
+    log = requestLog;
+    const run = { config, deadline: started + AI_BUDGET_MS, onCall: (call: LlmCall) => requestLog.call(call) };
     try {
-      const described = await describeImage(bytes.toString("base64"), mediaType, deadline);
+      const described = await describeImage(bytes.toString("base64"), mediaType, run);
       const written = await writeCaptions(described.description, {
+        ...run,
         style: style as JokeStyle,
         count: AI_BATCH,
-        deadline,
       });
       description = described.description.slice(0, DESCRIPTION_MAX);
       captions = written.captions.map((c) => c.slice(0, CAPTION_MAX));
       model = written.model;
     } catch (err) {
-      return error(err instanceof Error ? err.message : "The AI could not process this photo.", 502);
+      const message = err instanceof Error ? err.message : "The AI could not process this photo.";
+      await requestLog.finish({ status: "failed", error: message });
+      return error(message, 502);
     }
   } else {
     const cleanDescription = cleanText(form.get("description"), DESCRIPTION_MAX);
@@ -109,6 +127,7 @@ export async function POST(request: NextRequest) {
 
   // ---- Save: storage -> images row -> captions, with rollback ---------------
   const storagePath = `${user.id}/${randomUUID()}.${UPLOAD_EXT[mediaType]}`;
+  const requestId = log?.requestId ?? null;
   let uploaded = false;
   let imageId: string | null = null;
 
@@ -132,18 +151,27 @@ export async function POST(request: NextRequest) {
     imageId = image.id;
 
     if (captions.length > 0) {
-      const { error: captionError } = await supabase
-        .from("captions")
-        .insert(captions.map((text) => ({ image_id: image.id, user_id: user.id, text, model })));
+      const { error: captionError } = await supabase.from("captions").insert(
+        captions.map((text) => ({
+          image_id: image.id,
+          user_id: user.id,
+          text,
+          model,
+          ...(requestId ? { request_id: requestId } : {}),
+        })),
+      );
       if (captionError) throw new Error(`Could not save the jokes: ${captionError.message}`);
     }
   } catch (err) {
     // Roll back anything half-saved so the app never shows a broken photo.
     if (imageId) await supabase.from("images").delete().eq("id", imageId);
     if (uploaded) await supabase.storage.from("images").remove([storagePath]);
-    return error(err instanceof Error ? err.message : "Could not save the photo.", 500);
+    const message = err instanceof Error ? err.message : "Could not save the photo.";
+    await log?.finish({ status: "failed", error: message });
+    return error(message, 500);
   }
 
+  await log?.finish({ status: "succeeded", imageId, captionCount: captions.length });
   revalidatePath("/media");
   revalidatePath("/");
   return NextResponse.json({ id: imageId }, { status: 201 });

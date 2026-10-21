@@ -114,7 +114,7 @@ export function AdminBadge() {
 export function TableCard({ children, minWidth = 720, caption }: { children: ReactNode; minWidth?: number; caption?: string }) {
   return (
     <div className="card overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full border-collapse text-left text-sm" style={{ minWidth }}>
           {caption && <caption className="sr-only">{caption}</caption>}
           {children}

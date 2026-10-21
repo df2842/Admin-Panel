@@ -5,73 +5,16 @@ import { useEffect, useState } from "react";
 import type { JokeStyle } from "@/lib/joke-styles";
 import { AI_BATCH, CAPTION_MAX, DESCRIPTION_MAX, MAX_MANUAL_JOKES, MAX_UPLOAD_BYTES } from "@/lib/media";
 import StylePicker from "./StylePicker";
+import { jpegName, pickError, sendForm, shrinkImage, uploadStatusMessage } from "./upload";
 
 type Mode = "ai" | "manual";
 type Phase = "idle" | "preparing" | "uploading" | "processing" | "done";
 const PHASES: Phase[] = ["preparing", "uploading", "processing", "done"];
 
-/** Files bigger than this are likely to freeze the tab while decoding. */
-const MAX_PICK_BYTES = 40 * 1024 * 1024;
-
-/**
- * Downscales to a JPEG (longest edge <= 1600px) so uploads are fast and the
- * model gets a reasonable image. GIFs become a JPEG of their first frame.
- */
-async function shrink(file: File, maxEdge = 1600): Promise<Blob> {
-  const bitmap = await createImageBitmap(file).catch(() => {
-    throw new Error("Your browser couldn't open this image. Try a JPEG, PNG, WebP or GIF.");
-  });
-  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Your browser couldn't process this image.");
-  ctx.fillStyle = "#ffffff"; // transparent PNG/GIF areas become white, not black
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.86));
-  if (!blob) throw new Error("Your browser couldn't process this image.");
-  return blob;
-}
-
-type Reply = { status: number; data: { id?: unknown; error?: unknown } | null };
-
-/** POSTs with XMLHttpRequest so we can show real upload progress. */
-function postMedia(form: FormData, onProgress: (fraction: number) => void, onSent: () => void): Promise<Reply> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/media");
-    xhr.timeout = 90_000;
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(e.loaded / e.total);
-    };
-    xhr.upload.onload = () => {
-      onProgress(1);
-      onSent();
-    };
-    xhr.onload = () => {
-      let data: Reply["data"] = null;
-      try {
-        data = JSON.parse(xhr.responseText) as Reply["data"];
-      } catch {
-        data = null;
-      }
-      resolve({ status: xhr.status, data });
-    };
-    xhr.onerror = () => reject(new Error("Network error. Check your connection and try again."));
-    xhr.ontimeout = () => reject(new Error("The server took too long to answer. Please try again."));
-    xhr.send(form);
-  });
-}
-
 function statusMessage(status: number): string {
-  if (status === 401) return "Your session expired. Sign in again.";
   if (status === 403) return "Only superadmins can add media.";
-  if (status === 413) return "The photo is too large. Try a smaller one.";
   if (status === 504) return "The server timed out. Try again, or use manual mode.";
-  return `Upload failed (error ${status}).`;
+  return uploadStatusMessage(status);
 }
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -108,13 +51,9 @@ export default function NewMediaForm({ aiEnabled }: { aiEnabled: boolean }) {
 
   const pick = (f: File | undefined | null) => {
     if (!f || busy) return;
-    if (f.type && !f.type.startsWith("image/")) {
-      setError("That file isn't an image. Use a JPEG, PNG, WebP or GIF.");
-      setPhase("idle");
-      return;
-    }
-    if (f.size > MAX_PICK_BYTES) {
-      setError("That file is over 40 MB. Pick a smaller photo.");
+    const problem = pickError(f);
+    if (problem) {
+      setError(problem);
       setPhase("idle");
       return;
     }
@@ -137,11 +76,11 @@ export default function NewMediaForm({ aiEnabled }: { aiEnabled: boolean }) {
     setElapsed(0);
     setPhase("preparing");
     try {
-      const blob = await shrink(file);
+      const blob = await shrinkImage(file);
       if (blob.size > MAX_UPLOAD_BYTES) throw new Error("Even after shrinking, this photo is over 6 MB.");
 
       const form = new FormData();
-      form.append("file", blob, `${file.name.replace(/\.[^.]+$/, "") || "photo"}.jpg`);
+      form.append("file", blob, jpegName(file));
       form.append("mode", mode);
       if (mode === "ai") {
         form.append("style", style);
@@ -151,7 +90,9 @@ export default function NewMediaForm({ aiEnabled }: { aiEnabled: boolean }) {
       }
 
       setPhase("uploading");
-      const reply = await postMedia(form, setProgress, () => setPhase("processing"));
+      const reply = await sendForm<{ id?: unknown }>("POST", "/api/media", form, setProgress, () =>
+        setPhase("processing"),
+      );
       const id = reply.data?.id;
       if (reply.status !== 201 || typeof id !== "string") {
         const message = reply.data?.error;

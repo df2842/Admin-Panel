@@ -2,6 +2,8 @@ import Link from "next/link";
 import NewMediaForm from "@/components/media/NewMediaForm";
 import { requireAdmin } from "@/lib/admin";
 
+export const metadata = { title: "New photo" };
+
 export const dynamic = "force-dynamic";
 
 export default async function NewMediaPage() {

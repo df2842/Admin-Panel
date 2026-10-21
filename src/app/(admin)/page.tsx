@@ -13,6 +13,7 @@ import RefreshButton from "@/components/charts/RefreshButton";
 import StackedBar from "@/components/charts/StackedBar";
 import VoteHeatmap from "@/components/charts/VoteHeatmap";
 import VotesTimeline from "@/components/charts/VotesTimeline";
+import PipelinePanel from "@/components/dashboard/PipelinePanel";
 import {
   COLORS,
   WEEKDAYS,
@@ -134,6 +135,8 @@ export default async function DashboardPage() {
         </div>
         <p className="text-right text-xs text-muted">“This week” means the last {RECENT_DAYS} days.</p>
       </section>
+
+      <PipelinePanel supabase={supabase} />
 
       <Section
         title="Voting activity"

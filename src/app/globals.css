@@ -12,7 +12,8 @@
   --card: #ffffff;
   --border: #e4e1da;
   --muted: #6b665f;
-  --primary: #d9482b;
+  /* WCAG AA: white on primary 4.95:1, primary text on the page 4.58:1 */
+  --primary: #c94024;
   --primary-foreground: #ffffff;
   --accent: #f5b400;
   --accent-foreground: #2a1e00;
@@ -58,8 +59,10 @@
     --card: #1c1a18;
     --border: #2f2b28;
     --muted: #a8a197;
+    /* Dark text on primary (5.37:1): white is only 3.67:1, and a tomato dark
+       enough for white would fail as link text on these dark surfaces. */
     --primary: #e2593b;
-    --primary-foreground: #ffffff;
+    --primary-foreground: #0b0b0b;
     --accent: #f5b400;
     --accent-foreground: #2a1e00;
     --sidebar: #0c0b0a;
@@ -123,8 +126,9 @@ body {
       transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50
       focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary;
   }
+  /* Hover darkens in light mode and brightens in dark, so the label stays AA. */
   .btn-primary {
-    @apply bg-primary text-primary-foreground shadow-sm hover:brightness-110;
+    @apply bg-primary text-primary-foreground shadow-sm hover:brightness-90 dark:hover:brightness-110;
   }
   .btn-secondary {
     @apply border-2 border-border bg-card text-foreground hover:border-primary hover:text-primary;

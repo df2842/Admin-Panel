@@ -1,4 +1,4 @@
-import AdminNav from "@/components/AdminNav";
+import AdminNav, { MobileNav } from "@/components/AdminNav";
 import { requireAdmin } from "@/lib/admin";
 import { displayName } from "@/lib/format";
 
@@ -8,6 +8,10 @@ const MAIN_APP_URL = "https://hello-world-the-humor-project.vercel.app";
 /**
  * Shell for every admin page. requireAdmin() redirects visitors to /login and
  * non-superadmins to /denied before anything renders.
+ *
+ * Large screens: a full-height sidebar (brand, grouped sections that scroll
+ * when the window is short, account box pinned at the bottom).
+ * Small screens: a compact top bar with a "Menu" button.
  */
 export default async function AdminLayout({ children }: LayoutProps<"/">) {
   const { profile } = await requireAdmin();
@@ -17,9 +21,9 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
     <div className="flex items-center gap-3">
       {profile.avatar_url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={profile.avatar_url} alt="" referrerPolicy="no-referrer" className="h-9 w-9 rounded-full" />
+        <img src={profile.avatar_url} alt="" referrerPolicy="no-referrer" className="h-9 w-9 shrink-0 rounded-full" />
       ) : (
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-white/15" aria-hidden>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/15" aria-hidden>
           🙂
         </span>
       )}
@@ -38,38 +42,18 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-dvh flex-1 flex-col lg:flex-row">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col bg-sidebar p-4 text-sidebar-foreground lg:flex">
-        <p className="flex items-center gap-2 px-2 py-3 text-lg font-bold">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
+        <p className="flex shrink-0 items-center gap-2 px-5 pb-2 pt-5 text-lg font-bold">
           <span aria-hidden>🛡️</span> Admin Panel
         </p>
-        <nav aria-label="Admin" className="mt-4 flex-1">
-          <AdminNav variant="sidebar" />
-          <a
-            href={MAIN_APP_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-6 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-sidebar-foreground/70 hover:bg-white/10"
-          >
-            <span aria-hidden>🎭</span> Open the app ↗
-          </a>
-        </nav>
-        {account}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2">
+          <AdminNav appUrl={MAIN_APP_URL} />
+        </div>
+        <div className="shrink-0 border-t border-white/10 px-4 py-3">{account}</div>
       </aside>
 
-      {/* Mobile top bar */}
-      <header className="sticky top-0 z-20 bg-sidebar p-3 text-sidebar-foreground lg:hidden">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="font-bold">🛡️ Admin Panel</p>
-          <form action="/auth/signout" method="post">
-            <button type="submit" className="btn btn-sm bg-white/15 text-sidebar-foreground hover:bg-white/25">
-              Sign out
-            </button>
-          </form>
-        </div>
-        <nav aria-label="Admin">
-          <AdminNav variant="bar" />
-        </nav>
-      </header>
+      {/* Phone / tablet top bar */}
+      <MobileNav appUrl={MAIN_APP_URL} account={account} />
 
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-8">{children}</main>
     </div>
