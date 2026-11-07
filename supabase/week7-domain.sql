@@ -177,8 +177,9 @@ create index if not exists llm_responses_created_idx on public.llm_responses (cr
 -- re-running updates it.
 alter table public.generation_requests
   drop constraint if exists generation_requests_kind_check,
-  -- 'describe' = an admin re-describing a photo in the Admin Panel.
-  add constraint generation_requests_kind_check check (kind in ('upload', 'more_jokes', 'describe')),
+  -- 'describe' = an admin re-describing a photo in the Admin Panel;
+  -- 'chain_run' = a run from the Prompt Chain Tool (week8-chain-tool.sql).
+  add constraint generation_requests_kind_check check (kind in ('upload', 'more_jokes', 'describe', 'chain_run')),
   drop constraint if exists generation_requests_status_check,
   add constraint generation_requests_status_check check (status in ('running', 'succeeded', 'failed')),
   drop constraint if exists generation_requests_caption_count_check,

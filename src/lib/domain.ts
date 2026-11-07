@@ -94,8 +94,11 @@ export type GenerationRequest = {
   user_id: string;
   chain_id: number | null;
   image_id: string | null;
-  /** "describe" = an admin re-describing a photo (Replace photo, "Re-describe with AI"). */
-  kind: "upload" | "more_jokes" | "describe";
+  /**
+   * "describe" = an admin re-describing a photo (Replace photo, "Re-describe with AI").
+   * "chain_run" = a run started from the Prompt Chain Tool (week8-chain-tool.sql).
+   */
+  kind: "upload" | "more_jokes" | "describe" | "chain_run";
   style: string | null;
   status: "running" | "succeeded" | "failed";
   error: string | null;

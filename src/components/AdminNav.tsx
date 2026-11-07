@@ -100,20 +100,43 @@ function NavGroups({
   );
 }
 
-/** Link to the public app, shown under the sections. */
-function AppLink({ href }: { href: string }) {
+/** The Week 8 app where prompt chains and their steps are created, edited, reordered and run. */
+const PROMPT_CHAIN_TOOL_URL = "https://prompt-chain-tool-the-humor-project.vercel.app";
+
+function OutLink({ href, icon, label, touch }: { href: string; icon: string; label: string; touch: boolean }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-sidebar-foreground/70 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      className={`flex items-center gap-3 whitespace-nowrap rounded-xl px-3 text-sm text-sidebar-foreground/70 hover:bg-white/10 ${touch ? "py-2.5" : "py-1.5"} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary`}
     >
       <span aria-hidden className="w-5 text-center">
-        🎭
+        {icon}
       </span>
-      Open the app ↗<span className="sr-only"> (opens in a new tab)</span>
+      {label} ↗<span className="sr-only"> (opens in a new tab)</span>
     </a>
+  );
+}
+
+/** Links to the public app and the Prompt Chain Tool, shown under the sections. */
+function AppLinks({
+  appUrl,
+  touch = false,
+}: {
+  appUrl: string;
+  /** Taller rows for fingers (phone menu), like NavGroups; the sidebar stays compact. */
+  touch?: boolean;
+}) {
+  return (
+    <ul className="space-y-0.5 border-t border-white/10 pt-3">
+      <li>
+        <OutLink href={appUrl} icon="🎭" label="Open the app" touch={touch} />
+      </li>
+      <li>
+        <OutLink href={PROMPT_CHAIN_TOOL_URL} icon="🛠️" label="Prompt Chain Tool" touch={touch} />
+      </li>
+    </ul>
   );
 }
 
@@ -123,9 +146,7 @@ export default function AdminNav({ appUrl }: { appUrl: string }) {
   return (
     <nav aria-label="Admin" className="space-y-3">
       <NavGroups pathname={pathname} />
-      <div className="border-t border-white/10 pt-3">
-        <AppLink href={appUrl} />
-      </div>
+      <AppLinks appUrl={appUrl} />
     </nav>
   );
 }
@@ -242,9 +263,7 @@ export function MobileNav({ appUrl, account }: { appUrl: string; account: ReactN
       >
         <nav aria-label="Admin" className="space-y-3">
           <NavGroups pathname={pathname} onNavigate={() => close(false)} touch />
-          <div className="border-t border-white/10 pt-3">
-            <AppLink href={appUrl} />
-          </div>
+          <AppLinks appUrl={appUrl} touch />
         </nav>
         <div className="mt-3 border-t border-white/10 px-1 pt-3">{account}</div>
       </div>

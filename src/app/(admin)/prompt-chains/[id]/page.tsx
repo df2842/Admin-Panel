@@ -6,7 +6,7 @@ import SetupNotice from "@/components/SetupNotice";
 import MixEditor, { type MixRowView } from "@/components/pipeline/MixEditor";
 import PromptBlock, { PLACEHOLDER_TIP, PLACEHOLDER_TONE, PromptMarks } from "@/components/pipeline/PromptBlock";
 import { ChainStatusBadge, IoBadge, StepLabel } from "@/components/pipeline/badges";
-import { isKnownPlaceholder, placeholdersIn } from "@/components/pipeline/pipeline-utils";
+import { isKnownPlaceholder, placeholdersIn, stepPlaceholderRules } from "@/components/pipeline/pipeline-utils";
 import { EmptyState, ErrorCard } from "@/components/tables/ui";
 import { requireAdmin } from "@/lib/admin";
 import { APP_CHAIN_SLUG, APP_MAX_EXAMPLES, APP_MAX_TERMS } from "@/lib/config-data";
@@ -16,6 +16,18 @@ import { errorMessage } from "@/lib/people";
 import { loadChain, parseId, SchemaMissingError, type ChainDetail } from "@/lib/pipeline-data";
 
 export const dynamic = "force-dynamic";
+
+/** Chains and steps are edited, reordered and run in this separate app (Week 8). */
+const PROMPT_CHAIN_TOOL_URL = "https://prompt-chain-tool-the-humor-project.vercel.app";
+
+/** New-tab link styled as a button. */
+function ToolButton({ href, primary = false, children }: { href: string; primary?: boolean; children: string }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className={`btn btn-sm ${primary ? "btn-primary" : "btn-secondary"}`}>
+      {children} ↗<span className="sr-only"> (opens in a new tab)</span>
+    </a>
+  );
+}
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -71,8 +83,10 @@ export default async function PromptChainPage({ params }: Props) {
   }
 
   const { chain, steps, mix, runs, lastRunAt } = detail;
-  // Caption Arena only runs one chain (by slug), and only while it is active.
+  // Caption Arena's uploads only run one chain (by slug), and only while it is active. Its
+  // placeholders follow the upload rules; every other chain follows the tool's runner.
   const inUse = chain.is_active && chain.slug === APP_CHAIN_SLUG;
+  const toolHref = `${PROMPT_CHAIN_TOOL_URL}/chains/${chain.id}`;
   const mixRows: MixRowView[] = mix.map((m) => ({
     id: m.id,
     flavor: m.flavor,
@@ -128,11 +142,17 @@ export default async function PromptChainPage({ params }: Props) {
             <dd className="font-semibold">{formatDate(chain.updated_at)}</dd>
           </div>
         </dl>
-        {mixRows.length > 0 && (
-          <a href="#mix" className="btn btn-primary btn-sm mt-4">
-            Edit humor mix ↓
-          </a>
-        )}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <ToolButton href={toolHref} primary>
+            Edit in Prompt Chain Tool
+          </ToolButton>
+          <ToolButton href={`${toolHref}/media`}>Generated media</ToolButton>
+          {mixRows.length > 0 && (
+            <a href="#mix" className="btn btn-secondary btn-sm">
+              Edit humor mix ↓
+            </a>
+          )}
+        </div>
       </header>
 
       <section aria-labelledby="steps-title" className="mb-10">
@@ -141,19 +161,20 @@ export default async function PromptChainPage({ params }: Props) {
             Steps
           </h2>
           <p className="text-xs text-muted">
-            Read-only. Highlighted <mark className="rounded bg-accent/30 px-0.5 font-mono ring-1 ring-accent/70">{"{{placeholders}}"}</mark>{" "}
+            Highlighted <mark className="rounded bg-accent/30 px-0.5 font-mono ring-1 ring-accent/70">{"{{placeholders}}"}</mark>{" "}
             are filled in at run time.
           </p>
         </div>
 
         {steps.length === 0 ? (
           <EmptyState icon="🪜" title="This chain has no steps">
-            <p>Steps are added with SQL.</p>
+            <ToolButton href={toolHref}>Add steps in Prompt Chain Tool</ToolButton>
           </EmptyState>
         ) : (
           <ol>
             {steps.map((s, i) => {
               const placeholders = placeholdersIn(s.system_prompt, s.user_prompt);
+              const rules = stepPlaceholderRules(inUse, s.input_type, i);
               return (
                 <li key={s.id}>
                   {i > 0 && (
@@ -180,19 +201,19 @@ export default async function PromptChainPage({ params }: Props) {
                     </div>
                     {s.purpose && (
                       <p className="mt-2 max-w-3xl text-sm text-muted">
-                        <PromptMarks text={s.purpose} inputType={s.input_type} />
+                        <PromptMarks text={s.purpose} rules={rules} />
                       </p>
                     )}
                     {placeholders.length > 0 && (
                       <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted">
                         Fills in:
                         {placeholders.map((p) => {
-                          const tone = isKnownPlaceholder(p, s.input_type) ? "known" : "unknown";
+                          const tone = isKnownPlaceholder(p, rules) ? "known" : "unknown";
                           return (
                             <code
                               key={p}
                               className={`rounded px-1.5 py-0.5 font-mono ${PLACEHOLDER_TONE[tone]}`}
-                              title={PLACEHOLDER_TIP[tone]}
+                              title={PLACEHOLDER_TIP[rules.runner][tone]}
                             >
                               {`{{${p}}}`}
                             </code>
@@ -200,7 +221,8 @@ export default async function PromptChainPage({ params }: Props) {
                         })}
                       </p>
                     )}
-                    {s.input_type === "text" && (
+                    {/* Caption Arena's uploads add these; the tool's runner only sends {{terms}} / {{examples}}. */}
+                    {inUse && s.input_type === "text" && (
                       <p className="mt-2 text-xs text-muted">
                         Also sent: up to {APP_MAX_TERMS} active{" "}
                         <Link href="/terms" className="font-semibold text-primary hover:underline">
@@ -218,13 +240,13 @@ export default async function PromptChainPage({ params }: Props) {
                         label="System prompt"
                         hint="(instructions the model follows)"
                         text={s.system_prompt}
-                        inputType={s.input_type}
+                        rules={rules}
                       />
                       <PromptBlock
                         label="User prompt"
                         hint={s.input_type === "image" ? "(sent along with the photo)" : undefined}
                         text={s.user_prompt}
-                        inputType={s.input_type}
+                        rules={rules}
                       />
                     </div>
                   </article>
@@ -239,8 +261,8 @@ export default async function PromptChainPage({ params }: Props) {
       <section id="mix" className="scroll-mt-20 lg:scroll-mt-6">
         {!inUse && mixRows.length > 0 && (
           <p role="note" className="mb-3 text-sm text-muted">
-            <span aria-hidden>ℹ️</span> Caption Arena only runs the active “{APP_CHAIN_SLUG}” chain, so this mix has no effect
-            right now.
+            <span aria-hidden>ℹ️</span> Uploads only run the active “{APP_CHAIN_SLUG}” chain. This mix fills{" "}
+            <code className="font-mono">{"{{style}}"}</code> when the chain runs from the Prompt Chain Tool.
           </p>
         )}
         {mixRows.length === 0 ? (

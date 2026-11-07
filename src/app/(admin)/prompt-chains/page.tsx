@@ -11,6 +11,9 @@ import { loadChains, SchemaMissingError, type ChainListItem } from "@/lib/pipeli
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Prompt chains" };
 
+/** Chains and steps are created, edited, reordered and run in this separate app (Week 8). */
+const PROMPT_CHAIN_TOOL_URL = "https://prompt-chain-tool-the-humor-project.vercel.app";
+
 /** Request time, read once per render so every "x ago" agrees. */
 function requestTime(): number {
   return Date.now();
@@ -34,15 +37,21 @@ export default async function PromptChainsPage() {
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Prompt chains"
-        description="The steps Caption Arena runs to turn a photo into jokes. Steps are read-only; each chain's humor mix is editable."
-      />
+        description="The steps Caption Arena runs to turn a photo into jokes. Each chain's humor mix is editable here."
+      >
+        <a href={PROMPT_CHAIN_TOOL_URL} target="_blank" rel="noreferrer" className="btn btn-primary">
+          Edit in Prompt Chain Tool ↗<span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      </PageHeader>
 
       {missing && <SetupNotice what="The prompt chain tables" />}
       {error && <ErrorCard message={error} />}
 
       {!missing && !error && chains.length === 0 && (
         <EmptyState icon="⛓️" title="No prompt chains yet">
-          <p>Chains are added with SQL. Run supabase/week7-domain.sql to create the default “Describe, then joke” chain.</p>
+          <a href={PROMPT_CHAIN_TOOL_URL} target="_blank" rel="noreferrer" className="btn btn-secondary">
+            Create one in Prompt Chain Tool ↗<span className="sr-only"> (opens in a new tab)</span>
+          </a>
         </EmptyState>
       )}
 

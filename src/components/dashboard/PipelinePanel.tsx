@@ -11,7 +11,7 @@ import { RECENT_DAYS } from "@/lib/stats";
 
 /**
  * Dashboard panel: how Caption Arena's AI pipeline did over the last week,
- * from generation_requests (one row per upload / "more jokes" / re-describe run) and
+ * from generation_requests (one row per upload / "more jokes" / re-describe / chain run) and
  * llm_responses (one row per model call). Server component; it streams in
  * after the rest of the dashboard so a slow query never blocks the page.
  */
@@ -189,7 +189,7 @@ async function PipelineFigures({ supabase }: { supabase: Supabase }) {
         <p>
           <span className="font-semibold">No AI runs in the last {RECENT_DAYS} days.</span>{" "}
           <span className="text-muted">
-            Every AI upload, &ldquo;more jokes&rdquo; and re-describe run is logged here.
+            Every AI upload, &ldquo;more jokes&rdquo;, re-describe and chain run is logged here.
           </span>
         </p>
       </div>

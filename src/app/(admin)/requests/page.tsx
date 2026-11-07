@@ -111,7 +111,10 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
             </EmptyState>
           ) : (
             <EmptyState icon="🤖" title="No generation requests yet">
-              <p>Every AI upload, &ldquo;more jokes&rdquo; and re-describe run is logged here, from Caption Arena or this panel.</p>
+              <p>
+                Every AI upload, &ldquo;more jokes&rdquo;, re-describe and chain run is logged here, from Caption Arena, this
+                panel or the Prompt Chain Tool.
+              </p>
             </EmptyState>
           )
         ) : (
@@ -266,7 +269,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Generation requests"
-        description="Every AI run (uploads, “more jokes”, re-describes), newest first. Read-only."
+        description="Every AI run (uploads, “more jokes”, re-describes, chain runs), newest first. Read-only."
       />
 
       {missing && <SetupNotice what="The generation request tables" />}

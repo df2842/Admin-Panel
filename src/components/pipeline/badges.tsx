@@ -63,13 +63,15 @@ export const KIND_LABEL: Record<GenerationRequest["kind"], string> = {
   upload: "Upload",
   more_jokes: "More jokes",
   describe: "Re-describe",
+  chain_run: "Chain run",
 };
 
-/** ✨ matches the "Re-describe with AI" option on Replace photo. */
+/** ✨ matches the "Re-describe with AI" option on Replace photo; ⛓️ matches the Prompt Chain Tool. */
 export const KIND_ICON: Record<GenerationRequest["kind"], string> = {
   upload: "📤",
   more_jokes: "➕",
   describe: "✨",
+  chain_run: "⛓️",
 };
 
 export function KindBadge({ kind }: { kind: GenerationRequest["kind"] }) {
@@ -99,15 +101,15 @@ export function ActiveBadge({ active }: { active: boolean }) {
   );
 }
 
-/** Prompt chain status: Caption Arena only runs one chain, so an active chain can still be unused. */
+/** Prompt chain status: Caption Arena's uploads only run one chain, so an active chain can still be unused. */
 export function ChainStatusBadge({ active, inUse }: { active: boolean; inUse: boolean }) {
   if (!active) return <ActiveBadge active={false} />;
   return inUse ? (
-    <span className={`badge whitespace-nowrap ${OK}`} title="Active, and Caption Arena runs it.">
+    <span className={`badge whitespace-nowrap ${OK}`} title="Active, and Caption Arena's uploads run it.">
       <span aria-hidden>●</span> In use
     </span>
   ) : (
-    <span className={`badge whitespace-nowrap ${NEUTRAL}`} title="Active, but Caption Arena doesn't run this chain.">
+    <span className={`badge whitespace-nowrap ${NEUTRAL}`} title="Active, but Caption Arena's uploads don't run this chain.">
       <span aria-hidden>◐</span> Not used
     </span>
   );

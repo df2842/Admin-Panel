@@ -172,7 +172,12 @@ export async function loadChain(supabase: Supabase, id: number): Promise<ChainDe
 /* ---- Generation requests ----------------------------------------------------- */
 
 export const REQUEST_STATUSES = ["running", "succeeded", "failed"] as const;
-export const REQUEST_KINDS = ["upload", "more_jokes", "describe"] as const satisfies readonly GenerationRequest["kind"][];
+export const REQUEST_KINDS = [
+  "upload",
+  "more_jokes",
+  "describe",
+  "chain_run",
+] as const satisfies readonly GenerationRequest["kind"][];
 /** "" = all time (empty values drop out of the URL). */
 export const REQUEST_RANGES = ["", "7d", "30d"] as const;
 export const REQUESTS_PER_PAGE = 50;

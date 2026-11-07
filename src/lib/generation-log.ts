@@ -37,7 +37,7 @@ const clipOrNull = (s: string | null, max: number) => (s == null ? null : clip(s
  * Panel can show what the pipeline did. Logging is best-effort: if the
  * tables don't exist yet or a write fails, the action still succeeds.
  * A copy of Caption Arena's src/lib/generation-log.ts (keep them in sync),
- * except that `style` may be null: a re-describe writes no jokes.
+ * except for the Supabase client type.
  */
 export class GenerationLog {
   private pending: PromiseLike<unknown>[] = [];
@@ -52,9 +52,9 @@ export class GenerationLog {
     supabase: Supabase,
     input: {
       userId: string;
-      /** "describe" is an admin re-describing a photo. */
-      kind: "upload" | "more_jokes" | "describe";
-      /** null for "describe", which writes no jokes. */
+      /** "describe" is an admin re-describing a photo; "chain_run" a Prompt Chain Tool run. */
+      kind: "upload" | "more_jokes" | "describe" | "chain_run";
+      /** null for "describe" (writes no jokes) and "chain_run" (the chain's prompts set the style). */
       style: JokeStyle | null;
       chainId: number | null;
       imageId?: string;

@@ -8,8 +8,9 @@ import { isMixWeight, MIX_WEIGHT_MAX, MIX_WEIGHT_MIN } from "@/components/pipeli
 
 /**
  * The only write on the AI pipeline screens: a prompt chain's humor-flavor
- * mix weights. Prompt chains and steps themselves are read-only here (RLS
- * only lets superadmins UPDATE prompt_chain_mix), and only `weight` changes.
+ * mix weights (only `weight` changes). Chains, steps and mix rows are created
+ * and deleted in the Prompt Chain Tool; week8-chain-tool.sql adds those RLS
+ * policies on top of week7's UPDATE on prompt_chain_mix.
  */
 
 const fail = (error: string): ActionResult => ({ ok: false, error });

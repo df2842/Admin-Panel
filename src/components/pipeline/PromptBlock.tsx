@@ -1,25 +1,32 @@
-import { promptParts } from "./pipeline-utils";
+import { promptParts, type PlaceholderRules, type PlaceholderRunner } from "./pipeline-utils";
 
-/** Colors and tooltips for {{placeholders}}: known names vs names Caption Arena doesn't supply. */
+/** Colors and tooltips for {{placeholders}}: known names vs names the chain's runner doesn't supply. */
 export const PLACEHOLDER_TONE = {
   known: "bg-accent/30 text-foreground ring-1 ring-accent/70",
   unknown: "bg-danger/10 text-danger ring-1 ring-danger/50",
 } as const;
-export const PLACEHOLDER_TIP = {
-  known: "Filled in by Caption Arena at run time",
-  unknown: "Unknown placeholder: Caption Arena replaces it with empty text",
-} as const;
+export const PLACEHOLDER_TIP: Record<PlaceholderRunner, Record<keyof typeof PLACEHOLDER_TONE, string>> = {
+  arena: {
+    known: "Filled in by Caption Arena at run time",
+    unknown: "Unknown placeholder: Caption Arena replaces it with empty text",
+  },
+  tool: {
+    known: "Filled in when the chain runs",
+    unknown: "Unknown placeholder (or a later step): replaced with empty text",
+  },
+};
 
 /** Inline text with {{placeholders}} marked (unknown names flagged). Server-safe (no hooks). */
-export function PromptMarks({ text, inputType }: { text: string; inputType?: string }) {
+export function PromptMarks({ text, rules }: { text: string; rules?: PlaceholderRules }) {
+  const tips = PLACEHOLDER_TIP[rules?.runner ?? "arena"];
   return (
     <>
-      {promptParts(text, inputType).map((part, i) =>
+      {promptParts(text, rules).map((part, i) =>
         part.placeholder ? (
           <mark
             key={i}
             className={`rounded px-0.5 font-semibold ${PLACEHOLDER_TONE[part.known ? "known" : "unknown"]}`}
-            title={PLACEHOLDER_TIP[part.known ? "known" : "unknown"]}
+            title={tips[part.known ? "known" : "unknown"]}
           >
             {part.text}
           </mark>
@@ -32,12 +39,12 @@ export function PromptMarks({ text, inputType }: { text: string; inputType?: str
 }
 
 /** A prompt rendered as a readable monospace block with {{placeholders}} highlighted. */
-export function PromptText({ text, inputType, className = "" }: { text: string; inputType?: string; className?: string }) {
+export function PromptText({ text, rules, className = "" }: { text: string; rules?: PlaceholderRules; className?: string }) {
   return (
     <pre
       className={`max-h-[28rem] overflow-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-background p-3 font-mono text-[13px] leading-relaxed text-foreground sm:p-4 ${className}`}
     >
-      <PromptMarks text={text} inputType={inputType} />
+      <PromptMarks text={text} rules={rules} />
     </pre>
   );
 }
@@ -47,13 +54,13 @@ export default function PromptBlock({
   label,
   hint,
   text,
-  inputType,
+  rules,
 }: {
   label: string;
   hint?: string;
   text: string;
-  /** The step's input type: image steps get no {{placeholder}} values. */
-  inputType?: string;
+  /** Which {{placeholder}} names get values in this step (stepPlaceholderRules). */
+  rules?: PlaceholderRules;
 }) {
   return (
     <div className="min-w-0">
@@ -61,7 +68,7 @@ export default function PromptBlock({
         {label}
         {hint && <span className="font-normal normal-case tracking-normal">{hint}</span>}
       </p>
-      <PromptText text={text} inputType={inputType} />
+      <PromptText text={text} rules={rules} />
     </div>
   );
 }

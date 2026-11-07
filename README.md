@@ -24,7 +24,7 @@ tables on every generation, so changes here change how jokes get written.
 | --- | --- | --- | --- |
 | Terms | `/terms` | `terms` | create, read, update, delete |
 | AI examples | `/examples` | `ai_generation_examples` | create, read, update, delete |
-| Prompt chains | `/prompt-chains` | `prompt_chains`, `prompt_chain_steps`, `prompt_chain_mix` | read chains and steps; read and update the humor mix |
+| Prompt chains | `/prompt-chains` | `prompt_chains`, `prompt_chain_steps`, `prompt_chain_mix` | read chains and steps (edit them in the Prompt Chain Tool); read and update the humor mix |
 | Generation requests | `/requests` | `generation_requests` | read |
 | LLM responses | `/llm-responses` | `llm_responses` | read |
 | Models & providers | `/llm` | `llm_models`, `llm_providers` | create, read, update, delete |
@@ -47,6 +47,13 @@ How Caption Arena uses them:
   Otherwise the e-mail's domain (or a parent domain) must be on the list; an
   empty list lets anyone in. Row level security enforces the same rule on
   every write, not just at sign-in.
+
+Week 8 moves chain editing into its own superadmin-only app, the
+[Prompt Chain Tool](https://github.com/df2842/Prompt-Chain-Tool)
+(<https://prompt-chain-tool-the-humor-project.vercel.app>). It creates,
+edits, reorders, deletes and test-runs chains and their steps, and shows the
+media each chain generated. This panel links to it: **Edit in Prompt Chain
+Tool ↗** on the Prompt chains pages, and **Prompt Chain Tool ↗** in the menu.
 
 ## Security: every route is behind a Google login wall
 

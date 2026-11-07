@@ -57,33 +57,67 @@ export function splitBatch<K>(items: { key: K; weight: number }[], size: number)
 
 /**
  * `{{count}}`, `{{ style }}` ... exactly what Caption Arena's fill() matches
- * (Hello-World/src/lib/pipeline-config.ts). `{{a.b}}` or `{{a-b}}` is not a
- * placeholder there: it reaches the model as typed.
+ * (Hello-World/src/lib/pipeline-config.ts, used by uploads and the chain
+ * runner). `{{a.b}}` or `{{a-b}}` is not a placeholder there: it reaches the
+ * model as typed.
  */
 const PLACEHOLDER = /(\{\{\s*\w+\s*\}\})/g;
 const PLACEHOLDER_NAME = /^\{\{\s*(\w+)\s*\}\}$/;
+/** {{step1}} ... {{step99}}: the output of that earlier step (chain runner only). */
+const STEP_PLACEHOLDER = /^step([1-9]\d?)$/;
 
 /**
- * The names Caption Arena supplies to text (joke) steps; fill() turns any other
- * name into empty text. Image (describe) steps get no values at all.
+ * Who fills a chain's placeholders; fill() turns any name without a value into empty text.
+ * - "arena": Caption Arena's uploads (Hello-World src/lib/captions.ts), which only run the
+ *   active describe-then-joke chain. Text steps get count, style and description; image steps nothing.
+ * - "tool": the chain runner behind the Prompt Chain Tool (Hello-World src/lib/chain-runner.ts),
+ *   for every other chain. Every step gets the names below, plus {{stepN}} for earlier steps.
  */
-export const KNOWN_PLACEHOLDERS: readonly string[] = ["count", "style", "description"];
+export type PlaceholderRunner = "arena" | "tool";
 
-export function isKnownPlaceholder(name: string, inputType: string = "text"): boolean {
-  return inputType !== "image" && KNOWN_PLACEHOLDERS.includes(name);
+const RUNNER_PLACEHOLDERS: Record<PlaceholderRunner, readonly string[]> = {
+  arena: ["count", "style", "description"],
+  tool: ["input", "previous", "description", "count", "style", "terms", "examples"],
+};
+
+/** How one step's placeholders are filled. */
+export type PlaceholderRules = {
+  runner: PlaceholderRunner;
+  /** The step's input type: Caption Arena's uploads give "image" steps no values. */
+  inputType?: string;
+  /** The step's 1-based place in the chain: {{stepN}} only has a value when N is lower. */
+  position?: number;
+};
+
+/** Caption Arena's text-step rules, for prompts shown outside a chain. */
+const DEFAULT_RULES: PlaceholderRules = { runner: "arena", inputType: "text" };
+
+/**
+ * The rules for step `index` (0-based, by step_order) of a chain. `inUse` = Caption
+ * Arena's uploads run this chain; any other chain only runs from the Prompt Chain Tool.
+ */
+export function stepPlaceholderRules(inUse: boolean, inputType: string, index: number): PlaceholderRules {
+  return { runner: inUse ? "arena" : "tool", inputType, position: index + 1 };
+}
+
+export function isKnownPlaceholder(name: string, rules: PlaceholderRules = DEFAULT_RULES): boolean {
+  if (rules.runner === "arena") return rules.inputType !== "image" && RUNNER_PLACEHOLDERS.arena.includes(name);
+  const step = STEP_PLACEHOLDER.exec(name);
+  if (step) return rules.position === undefined || Number(step[1]) < rules.position;
+  return RUNNER_PLACEHOLDERS.tool.includes(name);
 }
 
 /** Splits prompt text into plain and placeholder parts (for highlighting). */
 export function promptParts(
   text: string,
-  inputType: string = "text",
+  rules: PlaceholderRules = DEFAULT_RULES,
 ): { text: string; placeholder: boolean; known: boolean }[] {
   return text
     .split(PLACEHOLDER)
     .filter((part) => part !== "")
     .map((part) => {
       const name = PLACEHOLDER_NAME.exec(part)?.[1];
-      return { text: part, placeholder: name !== undefined, known: name !== undefined && isKnownPlaceholder(name, inputType) };
+      return { text: part, placeholder: name !== undefined, known: name !== undefined && isKnownPlaceholder(name, rules) };
     });
 }
 
