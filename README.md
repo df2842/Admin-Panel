@@ -87,6 +87,14 @@ So the bootstrap path is: sign in once with Google (a trigger creates your
 `profiles` row), then run that one statement as the project owner. The end of
 `week6-admin.sql` does exactly this.
 
+To make someone else a superadmin (a TA, for example), even before they have
+signed in, run [`supabase/superadmin-invites.sql`](supabase/superadmin-invites.sql)
+once and add their Google address to `public.superadmin_invites` as the file's
+header shows. They are promoted the first time they sign in with Google using
+that address, or straight away if they already have. The list cannot be read
+or changed through the API, and an e-mail and password signup for an invited
+address is never promoted.
+
 ## Setup
 
 1. Run [`supabase/week6-admin.sql`](supabase/week6-admin.sql) and then
